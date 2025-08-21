@@ -7,6 +7,10 @@ class PomodoroTimer {
   private timerId: NodeJS.Timeout | null = null;
   private remainingTime: number = 0;
   private isWorking: boolean = false;
+  
+  public isTimerWorking(): boolean {
+    return this.isWorking;
+  }
   private isPaused: boolean = true;
   private cycleCount: number = 0;
   

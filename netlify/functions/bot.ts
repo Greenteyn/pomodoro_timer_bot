@@ -26,6 +26,7 @@ bot.use(session({
 const menuKeyboard = Markup.keyboard([
   ["Запустить новый таймер"],
   ["Остановить текущий таймер"],
+  ["Показать статус"],  // Добавили новую команду
   ["Про Помодоро Таймер"]
 ]).resize();
 
@@ -46,20 +47,6 @@ bot.hears("Запустить новый таймер", async (ctx) => {
   
   const statusInterval = setInterval(async () => {
     try {
-      const chatId = ctx.chat?.id;
-      if (!chatId) {
-        console.error('Chat ID is undefined');
-        return;
-      }
-      
-      console.log('Editing message for chat:', chatId);
-      const result = await ctx.telegram.editMessageText(
-        chatId,
-        ctx.session.statusMessageId,
-        undefined,
-        "Таймер запущен! 🍅\n\n" + pomodoroTimer.getStatus()
-      );
-      console.log('Message edit result:', result);
     } catch (e) {
       console.error("Ошибка при редактировании сообщения:", e);
     }
@@ -71,17 +58,21 @@ bot.hears("Запустить новый таймер", async (ctx) => {
 bot.hears("Остановить текущий таймер", async (ctx) => {
   pomodoroTimer.stopTimer();
   
-  if (ctx.session.statusInterval) {
-    clearInterval(ctx.session.statusInterval);
-    delete ctx.session.statusInterval;
-  }
-  
   if (ctx.session.statusMessageId) {
     delete ctx.session.statusMessageId;
   }
   
   const reply = await ctx.reply("Таймер остановлен");
   console.log('Stop timer reply:', reply);
+});
+
+bot.hears("Показать статус", async (ctx) => {
+  const status = pomodoroTimer.isTimerWorking() ?
+    "Таймер работает\n\n" + pomodoroTimer.getStatus() :
+    "Таймер остановлен";
+    
+  const reply = await ctx.reply(status);
+  console.log('Status reply:', reply);
 });
 
 bot.hears("Про Помодоро Таймер", async (ctx) => {
