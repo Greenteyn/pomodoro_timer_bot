@@ -4,93 +4,73 @@ class PomodoroTimer {
   private longBreakDuration: number = 15 * 60; // 15 минут
   private cyclesBeforeLongBreak: number = 4;
   
-  private timerId: NodeJS.Timeout | null = null;
-  private remainingTime: number = 0;
-  private isWorking: boolean = false;
+  private startTime: number | null = null; // Время начала текущей фазы (timestamp в миллисекундах)
+  private isWorking: boolean = false; // Работает ли таймер
+  private currentPhase: 'work' | 'break' = 'work'; // Текущая фаза
+  private cycleCount: number = 0; // Количество завершенных рабочих циклов
+  private currentPhaseDuration: number = 0; // Длительность текущей фазы в секундах
   
-  public isTimerWorking(): boolean {
-    return this.isWorking;
-  }
-  private isPaused: boolean = true;
-  private cycleCount: number = 0;
-  
-  constructor() {
-    this.reset();
-  }
-  
-  // Запуск/продолжение таймера
+  // Запуск таймера
   startTimer(): void {
-    if (this.isPaused) {
-      this.isPaused = false;
-      
-      if (!this.timerId) {
-        this.timerId = setInterval(() => this.tick(), 1000);
-      }
-    }
+    if (this.startTime !== null) return;
+    
+    this.currentPhase = 'work';
+    this.currentPhaseDuration = this.workDuration;
+    this.startTime = Date.now();
+    this.isWorking = true;
   }
   
   // Остановка таймера
   stopTimer(): void {
-    this.isPaused = true;
-    if (this.timerId) {
-      clearInterval(this.timerId);
-      this.timerId = null;
-    }
+    this.startTime = null;
+    this.isWorking = false;
   }
   
-  // Сброс таймера
-  reset(): void {
-    this.stopTimer();
-    this.isWorking = true;
-    this.isPaused = true;
-    this.cycleCount = 0;
-    this.remainingTime = this.workDuration;
-  }
-  
-  // Тик таймера (вызывается каждую секунду)
-  private tick(): void {
-    if (this.isPaused) return;
-    
-    this.remainingTime--;
-    
-    if (this.remainingTime <= 0) {
-      if (this.isWorking) {
-        this.cycleCount++;
-        
-        if (this.cycleCount >= this.cyclesBeforeLongBreak) {
-          this.remainingTime = this.longBreakDuration;
-          this.cycleCount = 0;
-        } else {
-          this.remainingTime = this.shortBreakDuration;
-        }
-      } else {
-        this.remainingTime = this.workDuration;
-      }
-      
-      this.isWorking = !this.isWorking;
-    }
-  }
-  
-  // Форматирование времени для вывода
-  getFormattedTime(): string {
-    const minutes = Math.floor(this.remainingTime / 60);
-    const seconds = this.remainingTime % 60;
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  }
-  
-  // Получение статуса таймера
+  // Получение текущего статуса
   getStatus(): string {
-    if (this.isPaused) {
-      return "Таймер остановлен";
+    if (this.startTime === null) {
+      return 'Таймер не запущен';
     }
     
-    const mode = this.isWorking ? "РАБОТА" : "ПЕРЕРЫВ";
-    return `${mode}: ${this.getFormattedTime()}`;
+    const now = Date.now();
+    const elapsedSeconds = Math.floor((now - this.startTime) / 1000);
+    const remaining = this.currentPhaseDuration - elapsedSeconds;
+    
+    if (remaining <= 0) {
+      this.completePhase();
+      return this.getStatus();
+    }
+    
+    const minutes = Math.floor(remaining / 60);
+    const seconds = remaining % 60;
+    return `Осталось: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}\nЦиклов завершено: ${this.cycleCount}`;
   }
   
-  // Получение текущего режима
-  getCurrentMode(): string {
-    return this.isWorking ? "work" : "break";
+  // Завершение текущей фазы и переход к следующей
+  private completePhase(): void {
+    if (this.startTime === null) return;
+    
+    const now = Date.now();
+    const elapsedSeconds = Math.floor((now - this.startTime) / 1000);
+    
+    if (elapsedSeconds < this.currentPhaseDuration) return;
+    
+    if (this.currentPhase === 'work') {
+      this.cycleCount++;
+      this.currentPhase = 'break';
+      this.currentPhaseDuration = (this.cycleCount % this.cyclesBeforeLongBreak === 0) 
+        ? this.longBreakDuration 
+        : this.shortBreakDuration;
+    } else {
+      this.currentPhase = 'work';
+      this.currentPhaseDuration = this.workDuration;
+    }
+    
+    this.startTime = now;
+  }
+  
+  public isTimerWorking(): boolean {
+    return this.isWorking;
   }
 }
 
