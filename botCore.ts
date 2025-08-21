@@ -2,6 +2,27 @@ import { Telegraf, Markup, Context } from "telegraf";
 import { session } from "telegraf";
 import PomodoroTimer from './timer';
 
+// Таймеры для каждого чата
+const userTimers = new Map<number, PomodoroTimer>();
+
+// Очистка неактивных таймеров (24 часа)
+setInterval(() => {
+  const now = Date.now();
+  // Преобразуем Map в массив для безопасной итерации
+  Array.from(userTimers.entries()).forEach(([chatId, timer]) => {
+    if (timer.isTimerWorking()) {
+      // Если таймер работает, пропускаем
+      return;
+    }
+    
+    // Если таймер остановлен более 24 часов назад, удаляем
+    const lastActivity = timer.getLastActivityTime();
+    if (now - lastActivity > 24 * 60 * 60 * 1000) {
+      userTimers.delete(chatId);
+    }
+  });
+}, 60 * 60 * 1000); // Каждый час
+
 export interface SessionContext extends Context {
   session: {
     statusMessageId?: number;
@@ -9,8 +30,6 @@ export interface SessionContext extends Context {
 }
 
 export function setupBot(bot: Telegraf<SessionContext>) {
-  const pomodoroTimer = new PomodoroTimer();
-
   bot.use(session({
     defaultSession: () => ({})
   }));
@@ -29,17 +48,35 @@ export function setupBot(bot: Telegraf<SessionContext>) {
     );
   });
 
+  // Получение или создание таймера для чата
+  const getOrCreateTimer = (chatId: number) => {
+    if (!userTimers.has(chatId)) {
+      userTimers.set(chatId, new PomodoroTimer());
+    }
+    return userTimers.get(chatId)!;
+  };
+
   bot.hears("Запустить новый таймер", async (ctx) => {
-    pomodoroTimer.startTimer();
+    const chatId = ctx.chat?.id;
+    if (!chatId) return;
     
-    const message = await ctx.reply("Таймер запущен! 25 минут работы начались 🍅\n\n" + pomodoroTimer.getStatus());
+    const timer = getOrCreateTimer(chatId);
+    timer.startTimer();
+    
+    const message = await ctx.reply("Таймер запущен! 25 минут работы начались 🍅\n\n" + timer.getStatus());
     console.log('Start timer message sent:', message);
     
     ctx.session.statusMessageId = message.message_id;
   });
 
   bot.hears("Остановить текущий таймер", async (ctx) => {
-    pomodoroTimer.stopTimer();
+    const chatId = ctx.chat?.id;
+    if (!chatId) return;
+    
+    const timer = userTimers.get(chatId);
+    if (!timer) return;
+    
+    timer.stopTimer();
     
     if (ctx.session.statusMessageId) {
       delete ctx.session.statusMessageId;
@@ -50,8 +87,12 @@ export function setupBot(bot: Telegraf<SessionContext>) {
   });
 
   bot.hears("Показать статус", async (ctx) => {
-    const status = pomodoroTimer.isTimerWorking() ? 
-      "Текущий статус:\n\n" + pomodoroTimer.getStatus() :
+    const chatId = ctx.chat?.id;
+    if (!chatId) return;
+    
+    const timer = userTimers.get(chatId);
+    const status = timer?.isTimerWorking() ?
+      "Текущий статус:\n\n" + timer.getStatus() :
       "Таймер остановлен";
       
     const reply = await ctx.reply(status);
