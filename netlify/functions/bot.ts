@@ -14,11 +14,19 @@ export const handler: Handler = async (event) => {
 
   try {
     const update = JSON.parse(event.body);
-    // Явно обрабатываем обновление и ждем завершения
-    await bot.handleUpdate(update);
+    console.log('Update received:', JSON.stringify(update, null, 2));
     
-    // Даем время на отправку ответов
-    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+      // Явно обрабатываем обновление и ждем завершения
+      await bot.handleUpdate(update);
+      console.log('Update processed successfully');
+    } catch (error) {
+      console.error('Error in bot.handleUpdate:', error);
+    }
+    
+    // Даем больше времени на отправку ответов
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    console.log('Response delay completed');
     
     return { statusCode: 200, body: '' };
   } catch (e) {
