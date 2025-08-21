@@ -8,11 +8,21 @@ const pomodoroTimer = new PomodoroTimer();
 // Здесь должен быть код бота из index.ts (без bot.launch())
 
 export const handler: Handler = async (event) => {
+  if (!event.body) {
+    return { statusCode: 400, body: 'Bad Request' };
+  }
+
   try {
-    await bot.handleUpdate(JSON.parse(event.body!));
+    const update = JSON.parse(event.body);
+    // Явно обрабатываем обновление и ждем завершения
+    await bot.handleUpdate(update);
+    
+    // Даем время на отправку ответов
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     return { statusCode: 200, body: '' };
   } catch (e) {
-    console.error(e);
+    console.error('Error handling update:', e);
     return { statusCode: 500, body: 'Internal Server Error' };
   }
 };
